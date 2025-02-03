@@ -31,60 +31,12 @@ php artisan key:generate --force
 
 php artisan p:environment:setup
 
-# Use expect to automate the subsequent input
-expect << EOF
-frozenfox909@gmail.com
-https://pyro.dhorizenko.com
-
-
-
-
-
-no
-
-
-
-EOF
-if [[ $? -eq 0 ]]; then
-  echo "Pterodactyl environment setup completed successfully."
-else
-  echo "Error during Pterodactyl environment setup."
-fi
-
 #ENV 2 db 
 php artisan p:environment:database
-expect << EOF
-
-
-
-
-ted70900!
-
-EOF
-if [[ $? -eq 0 ]]; then
-  echo "Pterodactyl environment setup completed successfully."
-else
-  echo "Error during Pterodactyl environment setup."
-fi
-
 php artisan migrate --seed --force
 
 #ENV 3 user
 php artisan p:user:make
-expect << EOF
-yes
-frozenfox909@gmail.com
-dhorizenko
-Teddy
-Farmer
-Ted70900!
-
-EOF
-if [[ $? -eq 0 ]]; then
-  echo "Pterodactyl User setup completed successfully."
-else
-  echo "Error during Pterodactyl environment setup."
-fi
 # end of php
 cd
 hown -R www-data:www-data /var/www/pterodactyl/*
@@ -111,7 +63,7 @@ cd
 # nginx# NGINX
 apt install nginx 
 rm /etc/nginx/sites-enabled/default
-makedir /etc/nginx/sites-available/
+mkdir /etc/nginx/sites-available/
 cd /etc/nginx/sites-available/
 curl -Lo pterodactyl.conf https://github.com/DhoriZenko/nginx_config_dz/releases/download/4/pterodactyl.conf
 sudo ln -s /etc/nginx/sites-available/pterodactyl.conf /etc/nginx/sites-enabled/pterodactyl.conf
