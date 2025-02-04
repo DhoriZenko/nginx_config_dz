@@ -1,0 +1,185 @@
+#!/bin/bash
+
+# This script installs all dependancies for ptarodactl
+
+#First lets update repo
+apt update 
+apt -y upgrade
+echo "Repo updated"
+
+read -r -p "Do you want to install Pterodactyl (yes/no): " choice
+
+case "$choice" in
+  yes|y|Yes|Y)
+    echo "Running cloudflared install."
+    # Put your command here:
+    # Basic dependincies
+	apt -y install software-properties-common curl apt-transport-https ca-certificates gnupg
+	LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php
+	curl -fsSL https://packages.redis.io/gpg | sudo gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg
+	echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/redis.list
+	curl -LsS https://r.mariadb.com/downloads/mariadb_repo_setup | sudo bash
+	apt update
+	apt -y install php8.3 php8.3-{common,cli,gd,mysql,mbstring,bcmath,xml,fpm,curl,zip} mariadb-server nginx tar unzip git redis-server
+	curl -sS https://getcomposer.org/installer | sudo php -- --install-dir=/usr/local/bin --filename=composer
+	mkdir -p /var/www/pterodactyl
+	cd /var/www/pterodactyl
+	curl -Lo panel.tar.gz https://github.com/pterodactyl/panel/releases/latest/download/panel.tar.gz
+	tar -xzvf panel.tar.gz
+	chmod -R 755 storage/* bootstrap/cache/
+	echo "Basic dependincies completed"
+
+	# MySQL
+	echo "WARNING WITH MY SQL PLEASE PRESS ENTER # TIMES DO NOT ENTER A PASSWORD"
+	mysql -u root -p -e "CREATE USER 'pterodactyl'@'127.0.0.1' IDENTIFIED BY 'ted70900!';"  # User password here
+	mysql -u root -p -e "CREATE DATABASE panel;"
+	mysql -u root -p -e "GRANT ALL PRIVILEGES ON panel.* TO 'pterodactyl'@'127.0.0.1' WITH GRANT OPTION;"
+
+	echo "MySQL operations completed."
+
+	# ENV 
+	cp .env.example .env
+	COMPOSER_ALLOW_SUPERUSER=1 composer install --no-dev --optimize-autoloader
+	php artisan key:generate --force
+
+	# ENV 1 
+
+	php artisan p:environment:setup
+
+	#ENV 2 db 
+	php artisan p:environment:database
+	php artisan migrate --seed --force
+
+	#ENV 3 user
+	php artisan p:user:make
+	# end of php
+
+	#Crontab and pteroq.service
+	cd
+	hown -R www-data:www-data /var/www/pterodactyl/*
+	echo "* * * * * php /var/www/pterodactyl/artisan schedule:run >> /dev/null 2>&1" | crontab -
+	cd /etc/systemd/system
+	curl -Lo pteroq.service https://github.com/DhoriZenko/nginx_config_dz/releases/download/4/pteroq.service
+	sudo systemctl enable --now redis-server
+	sudo systemctl enable --now pteroq.service
+	cd
+
+	#acme cert
+	cd
+	curl https://get.acme.sh | sh
+	sudo mkdir -p /etc/letsencrypt/live/pyro.dhorizenko.com
+	export CF_Zone_ID="9c06fa91c20c868ed68d935d34614d01"
+	export CF_Account_ID="da420b7deabb285e2fdf011e344ad2bd"
+	export CF_Token="6E37jMOGOFVeTJ15qAXw9MDpkGIYH34TVffC-01A"
+	sudo mkdir -p /etc/letsencrypt/live/pyro.dhorizenko.com
+	export CF_Key="6E37jMOGOFVeTJ15qAXw9MDpkGIYH34TVffC-01A"
+	export CF_Email="frozenfox909@gmail.com"
+	./.acme.sh/acme.sh --issue --dns dns_cf -d "pyro.dhorizenko.com" --server letsencrypt \
+	--key-file /etc/letsencrypt/live/pyro.dhorizenko.com/privkey.pem \
+	--fullchain-file /etc/letsencrypt/live/pyro.dhorizenko.com/fullchain.pem
+	cd
+	echo if you see a 20 second countdown it worked succsessfuly 
+
+	# nginx# NGINX
+	apt install nginx 
+	rm /etc/nginx/sites-enabled/default
+	cd /etc/nginx/sites-available/
+	curl -Lo pterodactyl.conf https://github.com/DhoriZenko/nginx_config_dz/releases/download/4/pterodactyl.conf
+	sudo ln -s /etc/nginx/sites-available/pterodactyl.conf /etc/nginx/sites-enabled/pterodactyl.conf
+	sudo systemctl restart nginx
+	cd
+
+	#wings
+	curl -sSL https://get.docker.com/ | CHANNEL=stable bash
+	sudo systemctl enable --now docker
+	sudo sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"/GRUB_CMDLINE_LINUX_DEFAULT="\1 swapaccount=1"/g' /etc/default/grub 
+	sudo update-grub
+	sudo mkdir -p /etc/pterodactyl
+	curl -L -o /usr/local/bin/wings "https://github.com/pterodactyl/wings/releases/latest/download/wings_linux_$([[ "$(uname -m)" == "x86_64" ]] && echo "amd64" || echo "arm64")"
+	sudo chmod u+x /usr/local/bin/wings	
+	mkdir /home/servers/
+	nano /etc/pterodactyl/config.yml 
+	sudo wings --debug
+	cd /etc/systemd/system/
+	curl -Lo wings.service https://github.com/DhoriZenko/nginx_config_dz/releases/download/4/wings.service
+	sudo systemctl enable --now wings
+	echo "If wings fails please redo nano /etc/pterodactyl/config.yml"
+  ;;
+  no|n|No|N)
+    echo "Skipping install"
+    ;;
+  *)
+    echo "Invalid input. Please enter yes or no."
+    ;;
+esac
+
+#other apps
+	adduser dhorizenko
+	mkdir /home/dhorizenko/downloads
+	cd /home/dhorizenko/downloads
+	curl -Lo dz_apps https://github.com/DhoriZenko/nginx_config/releases/download/4/dz_apps
+	cd
+
+read -r -p "Do you want to install other apps (yes/no): " choice
+
+case "$choice" in
+  yes|y|Yes|Y)
+    echo "Running cloudflared install."
+    # Put your command here:
+    echo "The script will run in 20 seconds. Please answer yes to any install prompts"
+	for i in $(seq 20 -1 1); do echo -ne "\r\e[32mScript starting in...$i "; sleep 1; done; echo -e "\nscript starting..\e[0m"
+
+	#casa OS 
+	curl -fsSL https://get.casaos.io | sudo bash
+	echo -e "\e[31mMake the port 88!!...automaticly on port 80 or 81 if pt was used\e[0m"
+	curl -fsSL https://get.casaos.io/port-change | sudo bash
+	echo -e "\e[32mCasaOS Installed on"
+	echo "IP: $(curl -s ifconfig.me):88\e[0m"
+	for i in $(seq 20 -1 1); do echo -ne "\r\e[32mWebmin installing in..$i "; sleep 1; done; echo -e "\nscript starting..\e[0m"
+
+	# WEBMIN 
+	curl -o webmin-setup-repos.sh https://raw.githubusercontent.com/webmin/webmin/master/webmin-setup-repos.sh
+	sh webmin-setup-repos.sh
+	apt-get install --install-recommends webmin usermin
+	echo -e "\e[32mWEBMIN INSTALLED\n User Root password (root password)"
+	echo -e "IP: $(curl -s ifconfig.me):10000\e[0m"
+	for i in $(seq 20 -1 1); do echo -ne "\r\e[32mKASM installing in...$i "; sleep 1; done; echo -e "\nscript starting..\e[0m"
+
+	# Kasm Workspace
+	cd /tmp
+	curl -O https://kasm-static-content.s3.amazonaws.com/kasm_release_1.16.1.98d6fa.tar.gz
+	tar -xf kasm_release_1.16.1.98d6fa.tar.gz
+	sudo bash kasm_release/install.sh -L 7000
+	echo -e "IP: $(curl -s ifconfig.me):7000\e[0m"
+	    ;;
+	  no|n|No|N)
+    echo "Skipping app install run bash /home/dhorizenko/dz_apps to install"
+    ;;
+  *)
+    echo "Invalid input. Please enter yes or no."
+    ;;
+esac
+
+read -r -p "Do you want to install cloudflared and port foword (yes/no): " choice
+
+case "$choice" in
+  yes|y|Yes|Y)
+    echo "Running cloudflared install."
+    # Put your command here:
+    curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+	sudo dpkg -i cloudflared.deb 
+	sudo cloudflared service install eyJhIjoiZGE0MjBiN2RlYWJiMjg1ZTJmZGYwMTFlMzQ0YWQyYmQiLCJ0IjoiOTI3NmRkYTItYTRiYS00NTdiLWFlY2UtYzlhMTY3MTI3OGYwIiwicyI6Ik9UVTFNR1U0TURFdE1tTXpPQzAwWldRM0xXRTNaVFF0TWpWbU5EYzJaR1ZsWm1JeiJ9
+    ;;
+  no|n|No|N)
+    echo "Skipping install"
+    ;;
+  *)
+    echo "Invalid input. Please enter yes or no."
+    ;;
+esac
+
+echo -e "\e[32mRunning apt update....\e[0m"
+apt update 
+apt -y upgrade
+
+# This is the end of the script
