@@ -1,0 +1,110 @@
+#!/bin/bash
+
+if [[ $UID -ne 0 ]]; then
+	echo -e "\e[31mMUST ME RAN AS ROOT"
+exit 1
+fi
+
+
+
+#this script installs all apps that dhorizenko will need on cloud server
+echo -e "\e[32mThis script will install all core aplications for Dhorizenko. the apps include Webmin, KasmWorkspace, CasaOS, AMP GAME PANEL and cloudflare all theses apps do not require web config and will continue through setup as normal."
+for i in $(seq 20 -1 1); do echo -ne "\r\e[32mScript starting in...$i "; sleep 1; done; echo -e "\nscript starting..\e[0m"
+apt update
+apt -y upgrade
+cd
+# WebMIN 
+read -r -p "Do you want to install Webmin(Recommended) (yes/no): " choice
+
+case "$choice" in
+  yes|y|Yes|Y)
+    echo "Running Webmin install."
+    # Put your command here:
+	curl -o webmin-setup-repos.sh https://raw.githubusercontent.com/webmin/webmin/master/webmin-setup-repos.sh
+	sh webmin-setup-repos.sh
+	apt-get install --install-recommends webmin usermin
+	echo -e "\e[32mWEBMIN INSTALLED\n User Root password (root password)"
+	echo -e "WebApp Address: $(curl -s ifconfig.me):10000\e[0m"
+    ;;
+  no|n|No|N)
+    echo "Skipping install"
+    ;;
+  *)
+    echo "Invalid input. Please enter yes or no."
+    ;;
+esac
+
+#AMP
+read -r -p "Do you want to install AMP GAME PANEL(Recommended) (yes/no): " choice
+
+case "$choice" in
+  yes|y|Yes|Y)
+    bash <(wget -qO- getamp.sh)
+	echo -e "WebApp Address: $(curl -s ifconfig.me):8080\e[0m"
+    ;;
+  no|n|No|N)
+    echo "Skipping install"
+    ;;
+  *)
+    echo "Invalid input. Please enter yes or no."
+    ;;
+esac
+
+#CasaOS Web GUI
+read -r -p "Do you want to install CasaOS (yes/no): " choice
+
+case "$choice" in
+  yes|y|Yes|Y)
+	curl -fsSL https://get.casaos.io | sudo bash
+	echo -e "\e[31mMake the port 88!!...automaticly on port 80 or 81 if pt was used\e[0m"
+	curl -fsSL https://get.casaos.io/port-change | sudo bash
+	echo -e "\e[32mCasaOS Installed on"
+	echo "WebApp Address: $(curl -s ifconfig.me):88\e[0m"
+    ;;
+  no|n|No|N)
+    echo "Skipping install"
+    ;;
+  *)
+    echo "Invalid input. Please enter yes or no."
+    ;;
+esac
+
+# KASM
+read -r -p "Do you want to install KASM KasmWorkspace(Recommended) (yes/no): " choice
+
+case "$choice" in
+  yes|y|Yes|Y)
+	cd /tmp
+	curl -O https://kasm-static-content.s3.amazonaws.com/kasm_release_1.16.1.98d6fa.tar.gz
+	tar -xf kasm_release_1.16.1.98d6fa.tar.gz
+	sudo bash kasm_release/install.sh -L 7000
+	echo -e "IP: $(curl -s ifconfig.me):7000\e[0m"
+    ;;
+  no|n|No|N)
+    echo "Skipping install"
+    ;;
+  *)
+    echo "Invalid input. Please enter yes or no."
+    ;;
+esac
+
+# Cloudflared
+read -r -p "Do you want to install Cloudflared(Recommended) (yes/no): " choice
+
+case "$choice" in
+  yes|y|Yes|Y)
+	curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+	sudo dpkg -i cloudflared.deb 
+	sudo cloudflared service install eyJhIjoiZGE0MjBiN2RlYWJiMjg1ZTJmZGYwMTFlMzQ0YWQyYmQiLCJ0IjoiOTI3NmRkYTItYTRiYS00NTdiLWFlY2UtYzlhMTY3MTI3OGYwIiwicyI6Ik9UVTFNR1U0TURFdE1tTXpPQzAwWldRM0xXRTNaVFF0TWpWbU5EYzJaR1ZsWm1JeiJ9
+    ;;
+  no|n|No|N)
+    echo "Skipping install"
+    ;;
+  *)
+    echo "Invalid input. Please enter yes or no."
+    ;;
+esac
+
+echo "updating repo"
+apt update
+for i in $(seq 20 -1 1); do echo -ne "\r\e[32mSleeping for...$i "; sleep 1; done; echo -e "\e[0m"
